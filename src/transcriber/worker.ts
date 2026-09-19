@@ -566,9 +566,31 @@ export class TranscriberWorkerService {
   }
 
   /**
+   * Immediately triggers processing of pending jobs in queue.
+   */
+  public triggerQueue(): void {
+    if (!this.isRunning) {
+      this.start().catch((err) => {
+        logger.error('[TranscriberWorker] Error starting worker on trigger', err);
+      });
+    }
+
+    if (this.isProcessingQueue) return;
+    this.isProcessingQueue = true;
+
+    this.processPendingQueue()
+      .catch((err) => {
+        logger.error('[TranscriberWorker] Error in triggered queue processing cycle', err);
+      })
+      .finally(() => {
+        this.isProcessingQueue = false;
+      });
+  }
+
+  /**
    * Processes pending jobs in the SQLite queue with sequential order
    */
-  private async processPendingQueue(): Promise<void> {
+  public async processPendingQueue(): Promise<void> {
     // Only fetch 1 job at a time to prevent concurrency collisions with @speech_transcriber_bot
     if (this.waitingFifoQueue.length > 0) {
       // Already waiting for response from @speech_transcriber_bot
